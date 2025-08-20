@@ -8,6 +8,8 @@ let mainWindow;
 let tray = null;
 let isQuitting = false;
 
+const isProd = app.isPackaged;
+
 function createTray() {
     let icon = nativeImage.createFromPath(ICON_PATH);
     // Windows tray looks best at 16–24px; Electron will scale, but we can help:
@@ -17,15 +19,19 @@ function createTray() {
     tray = new Tray(icon);
 
     const contextMenu = Menu.buildFromTemplate([
-        { label: 'Show', click: () => { mainWindow?.show(); mainWindow?.focus(); } },
-        { label: 'Hide', click: () => { mainWindow?.hide(); } },
+        { label: (mainWindow?.isVisible() ? 'Hide' : 'Show'),
+            click: () => { mainWindow?.isVisible() ? mainWindow.hide() : mainWindow?.show(); } },
         { type: 'separator' },
-        { label: 'Quit', click: () => { isQuitting = true; app.quit(); } }
+        { label: 'Toggle DevTools', accelerator: 'Ctrl+Shift+I',
+            click: () => mainWindow?.webContents.toggleDevTools() },
+        { type: 'separator' },
+        { label: 'Quit', click: () => { isQuitting = true; app.quit(); } },
     ]);
 
     tray.setToolTip('DSV-Client');
     tray.setContextMenu(contextMenu);
     tray.on('click', () => { mainWindow?.isVisible() ? mainWindow.hide() : mainWindow?.show(); });
+
 }
 
 async function createWindow() {
@@ -35,11 +41,12 @@ async function createWindow() {
     mainWindow = new BrowserWindow({
         width: 980,
         height: 720,
-        icon: ICON_PATH,                // <- window/taskbar icon
+        icon: ICON_PATH,
         webPreferences: {
             preload: path.join(__dirname, 'preload.js'),
             contextIsolation: true,
-            nodeIntegration: false
+            nodeIntegration: false,
+            devTools: !isProd, // only allow devtools in dev
         }
     });
 
