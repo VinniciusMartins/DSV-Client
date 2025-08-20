@@ -1,68 +1,82 @@
+// renderer/app.js
 const sel = (id) => document.getElementById(id);
-const printerSelect = sel('printer');
-const refreshBtn = sel('refreshPrinters');
-const refreshInfo = sel('refreshInfo');
-const pdfPathInput = sel('pdfPath');
-const printBtn = sel('printBtn');
-const stopBtn = sel('stopBtn');
-const statusEl = sel('status');
-const jobInfoEl = sel('jobInfo');
-const logEl = sel('log');
-const tickerEl = sel('ticker');
+
+const printerSelect   = sel('printer');
+const refreshBtn      = sel('refreshPrinters');
+const refreshInfo     = sel('refreshInfo');
+
+const listenStartBtn  = sel('listenStartBtn');
+const listenStopBtn   = sel('listenStopBtn');
+const reprintBtn      = sel('reprintBtn');
+const queueStateBadge = sel('queueStateBadge');
+
+const statusEl  = sel('status');   // "Tracking status" label element
+const jobInfoEl = sel('jobInfo');  // "Latest job" line element
+const logEl     = sel('log');
+const tickerEl  = sel('ticker');   // LIVE JOBS container
 
 let removeTickListener = null;
 const jobBoxes = new Map();
+const tickLineNodes = new Map(); // <-- new: one console line per job
 
+/* ---------- Log & Ticker helpers ---------- */
 function log(msg, cls='') {
     const ts = new Date().toLocaleTimeString();
-    logEl.innerHTML += `[${ts}] ${msg}\n`;
+    const line = document.createElement('div');
+    line.className = 'log-line';
+    line.textContent = `[${ts}] ${msg}`;
+    logEl.appendChild(line);
     logEl.scrollTop = logEl.scrollHeight;
     if (cls) statusEl.className = `status ${cls}`;
 }
 
-/* ===== Ticker helpers: one box per job, prepend on the left ===== */
+// live-updating console line for each jobId
+function logTick(jobId, status) {
+    const key = String(jobId);
+    const ts = new Date().toLocaleTimeString();
+    const pretty = friendlyFromInternal(status);
+
+    let node = tickLineNodes.get(key);
+    if (!node) {
+        node = document.createElement('div');
+        node.className = 'log-line tick-line';
+        logEl.appendChild(node);
+        tickLineNodes.set(key, node);
+    }
+    node.textContent = `[${ts}] [Tick] jobId=${key}, ${pretty}`;
+    logEl.scrollTop = logEl.scrollHeight;
+}
+
 function statusClassFromInternal(status) {
     const s = String(status || '').toLowerCase();
-    if (s === 'printed')  return 'success';   // green
-    if (s === 'printing') return 'printing';  // yellow
-    if (s === 'deleted' || s === 'deleting') return 'deleted'; // red
-    if (s === 'paused')   return 'paused';    // gray
-    if (s === 'waiting')  return 'waiting';   // light
-    if (s === 'retained') return 'retained';  // blue
+    if (s === 'printed')  return 'success';
+    if (s === 'printing') return 'printing';
+    if (s === 'deleted' || s === 'deleting') return 'deleted';
+    if (s === 'paused')   return 'paused';
+    if (s === 'waiting')  return 'waiting';
+    if (s === 'retained') return 'retained';
     return '';
 }
 
 function getOrCreateJobBox(jobId) {
     const key = String(jobId);
     if (jobBoxes.has(key)) return jobBoxes.get(key);
-
     const el = document.createElement('div');
     el.className = 'tick';
     el.dataset.jobId = key;
-
-    // PREPEND to the left
-    if (tickerEl.firstChild) {
-        tickerEl.insertBefore(el, tickerEl.firstChild);
-    } else {
-        tickerEl.appendChild(el);
-    }
-
+    if (tickerEl.firstChild) tickerEl.insertBefore(el, tickerEl.firstChild);
+    else tickerEl.appendChild(el);
     jobBoxes.set(key, el);
     return el;
 }
 
 function renderJobBox(jobId, { statusInternal, labelOverride }) {
     const el = getOrCreateJobBox(jobId);
-
-    // wipe old color classes
     el.classList.remove('success','printing','deleted','paused','waiting','retained');
-
     const cls = statusClassFromInternal(statusInternal);
     if (cls) el.classList.add(cls);
-
     const ts = new Date().toLocaleTimeString();
     const pretty = labelOverride || friendlyFromInternal(statusInternal);
-
     el.innerHTML = `
     <span class="ts">${ts}</span>
     <span class="label">Job #${jobId}</span><br/>
@@ -70,7 +84,7 @@ function renderJobBox(jobId, { statusInternal, labelOverride }) {
   `;
 }
 
-/* ===== Printers (with retry/backoff) ===== */
+/* ---------- Printer discovery (with backoff) ---------- */
 async function loadPrinters() {
     const printers = await window.PrintAPI.getPrinters();
     printerSelect.innerHTML = '';
@@ -83,7 +97,6 @@ async function loadPrinters() {
     refreshInfo.textContent = `Loaded ${printers?.length || 0} printers.`;
     log(`Loaded ${printers?.length || 0} printers.`);
 }
-
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 async function loadPrintersWithBackoff({ attempts = 5, baseDelay = 400, factor = 1.8, jitter = true } = {}) {
     let lastErr;
@@ -96,7 +109,7 @@ async function loadPrintersWithBackoff({ attempts = 5, baseDelay = 400, factor =
             lastErr = e;
             if (i < attempts) {
                 const wait = Math.floor(baseDelay * Math.pow(factor, i - 1)) + (jitter ? Math.floor(Math.random() * 150) : 0);
-                refreshInfo.textContent = `Retry ${i + 1}/${attempts} in ${Math.ceil(wait / 1000)}s...`;
+                refreshInfo.textContent = `Retry ${i + 1}/${attempts} in ${Math.ceil(wait/1000)}s...`;
                 await delay(wait);
             }
         }
@@ -104,114 +117,22 @@ async function loadPrintersWithBackoff({ attempts = 5, baseDelay = 400, factor =
     refreshInfo.textContent = 'Failed to load printers.';
     log(`Failed to load printers: ${lastErr?.message || 'unknown'}`, 'err');
 }
-
 async function initialLoadPrinters() {
     await loadPrintersWithBackoff({ attempts: 3, baseDelay: 300, factor: 2.0, jitter: true });
 }
-
-refreshBtn.addEventListener('click', () => {
+refreshBtn?.addEventListener('click', () => {
     loadPrintersWithBackoff({ attempts: 5, baseDelay: 400, factor: 1.8, jitter: true });
 });
 
-/* ===== Print & watch ===== */
-printBtn.addEventListener('click', async () => {
-    const printerName = printerSelect.value;
-    const pdfPath = pdfPathInput.value;
+/* ---------- Auth token helper ---------- */
+async function getAuthToken() {
+    try {
+        const res = await window.AuthAPI.getUser();
+        return res?.token || null;
+    } catch { return null; }
+}
 
-    if (!printerName) {
-        log('Select a printer first', 'err');
-        return;
-    }
-
-    // subscribe to status ticks (one at a time)
-    if (removeTickListener) removeTickListener();
-    removeTickListener = window.PrintAPI.onStatusTick(({ jobId, status }) => {
-        renderJobBox(jobId, { statusInternal: status });
-    });
-
-    log(`Sending "${pdfPath}" to "${printerName}"...`);
-    statusEl.textContent = 'Spooling...';
-    statusEl.className = 'status';
-
-    const sent = await window.PrintAPI.printPdf(printerName, pdfPath);
-    if (!sent.success) {
-        log(`Print error: ${sent.message}`, 'err');
-        statusEl.textContent = 'Error';
-        statusEl.className = 'status err';
-        return;
-    }
-
-    log('Print sent. Looking up latest job...');
-    setTimeout(async () => {
-        const res = await window.PrintAPI.fetchLatestJob(printerName);
-        if (!res.success) {
-            log(`Could not fetch latest job: ${res.message}`, 'err');
-            return;
-        }
-        if (!res.job) {
-            log('No jobs found in queue (may have printed too fast). Declaring success.');
-            statusEl.textContent = 'Printed successfully';
-            statusEl.className = 'status ok';
-            jobInfoEl.textContent = '—';
-            return;
-        }
-
-        const job = res.job;
-        const id  = job.Id || job.ID || job.id;
-
-        // prefer the stringified status added by PowerShell: JobStatusText
-        const raw = job.JobStatusText || job.JobStatus || job.jobStatus || 'Unknown';
-
-        const internal = psStatusToInternal(raw);
-        const pretty   = friendlyFromInternal(internal);
-
-        // ensure the job box exists right away and shows initial status
-        renderJobBox(id, { statusInternal: internal });
-
-        jobInfoEl.textContent = `ID=${id}, Status=${pretty}, Doc=${job.Document || ''}`;
-        statusEl.textContent  = `Tracking... (${pretty})`;
-
-        const outcome = await window.PrintAPI.watchJob(printerName, id);
-
-        if (outcome.success) {
-            if (outcome.state === 'printed') {
-                statusEl.textContent = 'Printed successfully';
-                statusEl.className = 'status ok';
-                log('Printed successfully ✅');
-
-                // finalize box as green/white with final label
-                renderJobBox(id, { statusInternal: 'printed', labelOverride: 'Printed successfully ✅' });
-
-            } else if (outcome.state === 'deleted') {
-                statusEl.textContent = 'Deleted successfully';
-                statusEl.className = 'status warn';
-                log('Deleted successfully 🗑️');
-
-                // finalize box as red with final label
-                renderJobBox(id, { statusInternal: 'deleted', labelOverride: 'Deleted successfully' });
-
-            } else {
-                statusEl.textContent = 'Done';
-                log(`Done: ${outcome.state}`);
-                renderJobBox(id, { statusInternal: outcome.state });
-            }
-        } else {
-            statusEl.textContent = 'Watch error';
-            statusEl.className = 'status err';
-            log(`Watch error: ${outcome.message || 'unknown'}`, 'err');
-        }
-    }, 800);
-});
-
-stopBtn.addEventListener('click', async () => {
-    await window.PrintAPI.stopWatch();
-    statusEl.textContent = 'Stopped';
-    statusEl.className = 'status warn';
-    log('Stopped watching.');
-    if (removeTickListener) { removeTickListener(); removeTickListener = null; }
-});
-
-/* ===== Status label helpers ===== */
+/* ---------- Status translation ---------- */
 function friendlyFromInternal(status) {
     switch (String(status || '').toLowerCase()) {
         case 'waiting':  return 'Waiting printing';
@@ -225,15 +146,104 @@ function friendlyFromInternal(status) {
     }
 }
 
-function psStatusToInternal(raw) {
-    const s = String(raw || '').toLowerCase();
-    if (s.includes('deleting')) return 'Deleting';
-    if (s.includes('paused'))   return 'Paused';
-    if (s.includes('printing') || s.includes('spooling') || s.includes('processing')) return 'Printing';
-    if (s.includes('retained')) return 'Retained';
-    if (s.includes('normal'))   return 'Waiting';
-    return 'Unknown';
-}
+/* ---------- Ticks: update LIVE JOBS + header + single-line console ---------- */
+if (removeTickListener) removeTickListener();
+removeTickListener = window.PrintAPI.onStatusTick(({ jobId, status }) => {
+    // LIVE JOBS
+    renderJobBox(jobId, { statusInternal: status });
 
-/* ===== Init ===== */
+    // Console (one row per jobId)
+    logTick(jobId, status);
+
+    // Header
+    const pretty = friendlyFromInternal(status);
+    const idText = (jobId === 'instant' || jobId === 'reprint') ? '—' : jobId;
+    jobInfoEl.textContent = `ID=${idText}, Status=${pretty}`;
+
+    const s = String(status || '').toLowerCase();
+    if (s === 'printed') {
+        statusEl.textContent = 'Printed successfully';
+        statusEl.className = 'status ok';
+    } else if (s === 'deleted') {
+        statusEl.textContent = 'Deleted successfully';
+        statusEl.className = 'status warn';
+    } else if (s === 'paused') {
+        statusEl.textContent = 'Paused';
+        statusEl.className = 'status warn';
+    } else {
+        statusEl.textContent = `Tracking... (${pretty})`;
+        statusEl.className = 'status';
+    }
+});
+
+/* ---------- Queue state + logs ---------- */
+window.QueueAPI?.onState?.(({ state, printerName, reason, jobId }) => {
+    const map = {
+        listening:        'Queue: listening',
+        tracking:         'Queue: tracking…',
+        'paused-tracking':'Queue: paused (tracking…)',
+        stopping:         'Queue: stopping…',
+        stopped:          `Queue: stopped${reason ? ' (' + reason + ')' : ''}`
+    };
+    queueStateBadge.textContent = map[state] || `Queue: ${state}`;
+
+    // Gentle UI hints per state (won't fight with tick updates)
+    if (state === 'listening') {
+        statusEl.textContent = 'Listening for jobs…';
+        statusEl.className = 'status';
+        jobInfoEl.textContent = '—';
+    } else if (state === 'tracking') {
+        // we’re following a specific spooler job (Printing/Waiting/Retained)
+        statusEl.textContent = 'Tracking current job…';
+        statusEl.className = 'status';
+    } else if (state === 'paused-tracking') {
+        // keep tracking while paused — don’t stop queue logic until job disappears/prints
+        statusEl.textContent = 'Paused (tracking…)';
+        statusEl.className = 'status warn';
+    } else if (state === 'stopping') {
+        statusEl.textContent = 'Stopping…';
+        statusEl.className = 'status';
+    } else if (state === 'stopped') {
+        statusEl.textContent = 'Stopped';
+        statusEl.className = 'status warn';
+    }
+});
+
+window.QueueAPI?.onLog?.(({ msg }) => {
+    log(`[Q] ${msg}`);
+});
+
+/* ---------- Queue controls ---------- */
+listenStartBtn?.addEventListener('click', async () => {
+    const printerName = printerSelect.value;
+    if (!printerName) { log('Select a printer first', 'err'); return; }
+    // proactively set badge
+    queueStateBadge.textContent = 'Queue: starting…';
+    await window.QueueAPI.stop();                // ensure stopped before retry
+    const token = await getAuthToken();
+    const r = await window.QueueAPI.start(printerName, token);
+    if (r?.success) log('Queue listening started.');
+});
+
+listenStopBtn?.addEventListener('click', async () => {
+    // proactively set badge
+    queueStateBadge.textContent = 'Queue: stopping…';
+    const r = await window.QueueAPI.stop();
+    if (r?.success) log('Queue listening stopped.');
+});
+
+reprintBtn?.addEventListener('click', async () => {
+    const printerName = printerSelect.value;
+    if (!printerName) { log('Select a printer first', 'err'); return; }
+    queueStateBadge.textContent = 'Queue: stopping…';
+    await window.QueueAPI.stop('reprint');       // stop auto before retry
+    const r = await window.QueueAPI.reprintLast(printerName);
+    if (!r?.success) {
+        log(`Reprint failed: ${r?.message || 'unknown'}`, 'err');
+        return;
+    }
+    log(`Reprint outcome: ${r.state || 'done'}`);
+});
+
+/* ---------- Init ---------- */
 initialLoadPrinters();
