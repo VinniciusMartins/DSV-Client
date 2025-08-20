@@ -1,0 +1,36 @@
+{
+  "name": "DSV-Client",
+  "version": "1.0.0",
+  "private": true,
+  "main": "main.js",
+  "type": "commonjs",
+  "description": "Electron client to print a PDF and track Windows print job status with PowerShell.",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "pack:win": "electron-builder --win portable",
+    "dist:win": "electron-builder --win nsis"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^31.2.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.dsv.client",
+    "productName": "DSV-Client",
+    "files": [
+      "main.js",
+      "preload.js",
+      "controllers/**/*",
+      "services/**/*",
+      "models/**/*",
+      "renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": ["nsis", "portable"]
+    }
+  }
+}

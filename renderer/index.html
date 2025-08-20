@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>DSV-Client – Print Tracker</title>
+    <style>
+        body { font-family: system-ui, Arial, sans-serif; padding: 18px; }
+        .row { margin-bottom: 12px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        select, input, button { font-size: 14px; padding: 6px 10px; }
+        .log { white-space: pre-wrap; background: #111; color: #e6e6e6; padding: 10px; border-radius: 6px; min-height: 140px; }
+        .status { font-weight: 600; }
+        .ok { color: #18a558; }
+        .warn { color: #e0a800; }
+        .err { color: #c92a2a; }
+        .muted { opacity: .8; }
+        .ticker {
+            display: flex; gap: 10px; overflow-x: auto; padding: 8px; border: 1px dashed #999; border-radius: 6px;
+            background: #f6f6f6; max-width: 860px
+        }
+        .tick {
+            font-size: 12px; padding: 6px 8px; border-radius: 6px; background: #fff; border: 1px solid #ddd;
+            min-width: 160px;
+        }
+        .tick .ts { display: block; font-size: 11px; opacity: .7; }
+        .tick .label { font-weight: 600; }
+        .ticker { display:flex; gap:10px; overflow-x:auto; padding:8px; border:1px dashed #999; border-radius:6px; background:#f6f6f6; max-width:860px }
+        .tick { font-size:12px; padding:8px 10px; border-radius:6px; background:#fff; border:1px solid #ddd; min-width:180px }
+        .tick .ts { display:block; font-size:11px; opacity:.7 }
+        .tick .label { font-weight:600 }
+
+        /* status colors */
+        .tick.success { background:#18a558; color:#fff; border:none; }
+        .tick.printing { background:#ffc107; color:#000; }
+        .tick.deleted { background:#dc3545; color:#fff; }
+        .tick.paused { background:#6c757d; color:#fff; }
+        .tick.waiting { background:#f8f9fa; color:#000; }
+        .tick.retained { background:#0d6efd; color:#fff; }
+    </style>
+</head>
+<body>
+<h2>DSV-Client – Print tracker</h2>
+
+<div class="row">
+    <label for="printer">Printer:</label>
+    <select id="printer"></select>
+    <button id="refreshPrinters">Refresh</button>
+    <span id="refreshInfo" class="muted"></span>
+</div>
+
+<div class="row">
+    <label for="pdfPath">PDF path:</label>
+    <input id="pdfPath" size="60" value="C:\\Users\\vinni\\Downloads\\dummy.pdf" />
+    <button id="printBtn">Print</button>
+    <button id="stopBtn">Stop Watch</button>
+</div>
+
+<div class="row">
+    <div>Latest job: <span id="jobInfo" class="muted">—</span></div>
+</div>
+
+<div class="row">
+    <div>Tracking status: <span id="status" class="status">—</span></div>
+</div>
+
+<div class="row">
+    <div class="ticker" id="ticker"></div>
+</div>
+
+<div class="row">
+    <div class="log" id="log"></div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>
