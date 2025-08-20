@@ -36,7 +36,7 @@
     &quot;git-widget-placeholder&quot;: &quot;main&quot;,
     &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
     &quot;junie.onboarding.icon.badge.shown&quot;: &quot;true&quot;,
-    &quot;last_opened_file_path&quot;: &quot;C:/Users/vinni/DSV-Client/assets&quot;,
+    &quot;last_opened_file_path&quot;: &quot;C:/Users/vinni/DSV-Client/vendor&quot;,
     &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
     &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
     &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
@@ -49,7 +49,11 @@
 }</component>
   <component name="RecentsManager">
     <key name="CopyFile.RECENT_KEYS">
+      <recent name="C:\Users\vinni\DSV-Client\vendor" />
       <recent name="C:\Users\vinni\DSV-Client\assets" />
+    </key>
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\vinni\DSV-Client" />
     </key>
   </component>
   <component name="SharedIndexes">
@@ -72,6 +76,7 @@
       <workItem from="1755285399002" duration="1624000" />
       <workItem from="1755571834467" duration="21024000" />
       <workItem from="1755668303964" duration="2434000" />
+      <workItem from="1755722186461" duration="1460000" />
     </task>
     <servers />
   </component>

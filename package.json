@@ -9,13 +9,15 @@
   "license": "MIT",
   "scripts": {
     "start": "electron .",
-    "pack:win": "electron-builder --win portable",
-    "dist:win": "electron-builder --win nsis"
+    "pack:win": "npm run build:ico && electron-builder --win portable",
+    "dist:win": "npm run build:ico && electron-builder --win nsis",
+    "build:ico": "node build/make-ico.js"
   },
-  "dependencies": {},
   "devDependencies": {
     "electron": "^31.2.0",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "^24.13.3",
+    "png-to-ico": "^3.0.0",
+    "sharp": "^0.34.3"
   },
   "build": {
     "appId": "com.dsv.client",
@@ -30,8 +32,29 @@
       "renderer/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "vendor/PowerShell-7.5.2-win-x64.msi",
+        "to": "PowerShell-7.5.2-win-x64.msi"
+      }
+    ],
     "win": {
-      "target": ["nsis", "portable"]
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "icon": "assets/app-icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "DSV-Client",
+      "runAfterFinish": true,
+      "include": "build/installer.nsh"
     }
   }
 }

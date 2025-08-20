@@ -3,7 +3,7 @@ const path = require('path');
 
 const PrintController = require('./controllers/printController');
 const AuthController  = require('./controllers/authController');
-const QueueController = require('./controllers/queueController'); // ← IMPORTANT
+const QueueController = require('./controllers/queueController');
 
 let mainWindow;
 let tray = null;
@@ -40,10 +40,9 @@ async function createWindow() {
         }
     });
 
-    // IMPORTANT: register ALL IPC handlers BEFORE loading any renderer HTML
     PrintController.register(ipcMain, mainWindow);
     AuthController.register(ipcMain);
-    QueueController.register(ipcMain, mainWindow); // ← THIS LINE fixes the “No handler registered” error
+    QueueController.register(ipcMain, mainWindow);
 
     await mainWindow.loadFile(path.join(__dirname, 'renderer', 'login.html'));
 
@@ -58,4 +57,4 @@ app.whenReady().then(() => {
 });
 
 app.on('before-quit', () => { isQuitting = true; });
-app.on('window-all-closed', () => { /* keep alive for tray on Windows */ });
+app.on('window-all-closed', () => {});
