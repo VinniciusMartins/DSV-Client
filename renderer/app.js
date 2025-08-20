@@ -17,7 +17,7 @@ const tickerEl  = sel('ticker');   // LIVE JOBS container
 
 let removeTickListener = null;
 const jobBoxes = new Map();
-const tickLineNodes = new Map(); // <-- new: one console line per job
+const tickLineNodes = new Map(); // one console line per job
 
 /* ---------- Log & Ticker helpers ---------- */
 function log(msg, cls='') {
@@ -55,6 +55,7 @@ function statusClassFromInternal(status) {
     if (s === 'paused')   return 'paused';
     if (s === 'waiting')  return 'waiting';
     if (s === 'retained') return 'retained';
+    if (s === 'unknown')  return 'unknown';
     return '';
 }
 
@@ -72,7 +73,8 @@ function getOrCreateJobBox(jobId) {
 
 function renderJobBox(jobId, { statusInternal, labelOverride }) {
     const el = getOrCreateJobBox(jobId);
-    el.classList.remove('success','printing','deleted','paused','waiting','retained');
+    // include 'unknown' so classes don't stack when state changes
+    el.classList.remove('success','printing','deleted','paused','waiting','retained','unknown');
     const cls = statusClassFromInternal(statusInternal);
     if (cls) el.classList.add(cls);
     const ts = new Date().toLocaleTimeString();
@@ -142,6 +144,7 @@ function friendlyFromInternal(status) {
         case 'printing': return 'Printing';
         case 'printed':  return 'Printed successfully ✅';
         case 'deleted':  return 'Deleted successfully';
+        case 'unknown':  return 'Check printer';
         default:         return status || 'Unknown';
     }
 }
@@ -170,6 +173,9 @@ removeTickListener = window.PrintAPI.onStatusTick(({ jobId, status }) => {
     } else if (s === 'paused') {
         statusEl.textContent = 'Paused';
         statusEl.className = 'status warn';
+    } else if (s === 'unknown') {
+        statusEl.textContent = 'Check printer';
+        statusEl.className = 'status err';
     } else {
         statusEl.textContent = `Tracking... (${pretty})`;
         statusEl.className = 'status';
@@ -193,11 +199,9 @@ window.QueueAPI?.onState?.(({ state, printerName, reason, jobId }) => {
         statusEl.className = 'status';
         jobInfoEl.textContent = '—';
     } else if (state === 'tracking') {
-        // we’re following a specific spooler job (Printing/Waiting/Retained)
         statusEl.textContent = 'Tracking current job…';
         statusEl.className = 'status';
     } else if (state === 'paused-tracking') {
-        // keep tracking while paused — don’t stop queue logic until job disappears/prints
         statusEl.textContent = 'Paused (tracking…)';
         statusEl.className = 'status warn';
     } else if (state === 'stopping') {
@@ -217,16 +221,14 @@ window.QueueAPI?.onLog?.(({ msg }) => {
 listenStartBtn?.addEventListener('click', async () => {
     const printerName = printerSelect.value;
     if (!printerName) { log('Select a printer first', 'err'); return; }
-    // proactively set badge
     queueStateBadge.textContent = 'Queue: starting…';
-    await window.QueueAPI.stop();                // ensure stopped before retry
+    await window.QueueAPI.stop(); // ensure stopped before retry
     const token = await getAuthToken();
     const r = await window.QueueAPI.start(printerName, token);
     if (r?.success) log('Queue listening started.');
 });
 
 listenStopBtn?.addEventListener('click', async () => {
-    // proactively set badge
     queueStateBadge.textContent = 'Queue: stopping…';
     const r = await window.QueueAPI.stop();
     if (r?.success) log('Queue listening stopped.');
@@ -236,7 +238,7 @@ reprintBtn?.addEventListener('click', async () => {
     const printerName = printerSelect.value;
     if (!printerName) { log('Select a printer first', 'err'); return; }
     queueStateBadge.textContent = 'Queue: stopping…';
-    await window.QueueAPI.stop('reprint');       // stop auto before retry
+    await window.QueueAPI.stop('reprint'); // stop auto before retry
     const r = await window.QueueAPI.reprintLast(printerName);
     if (!r?.success) {
         log(`Reprint failed: ${r?.message || 'unknown'}`, 'err');

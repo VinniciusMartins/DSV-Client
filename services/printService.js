@@ -11,9 +11,14 @@ const STATES = {
     UNKNOWN: 'Unknown'
 };
 
-// When a job disappears from the spooler and the last known state was one of these,
-// we will treat the outcome as "deleted" (not "printed").
-const DELETED_ON_DISAPPEAR = new Set([STATES.DELETING, STATES.PAUSED, STATES.WAITING]);
+// If a job disappears while last known state was one of these,
+// treat outcome as "deleted" (not "printed").
+const DELETED_ON_DISAPPEAR = new Set([
+    STATES.DELETING,
+    STATES.PAUSED,
+    STATES.WAITING,
+    STATES.UNKNOWN // <— NEW: Unknown disappears => Deleted
+]);
 
 class PrintService {
     constructor(mainWindow) {
@@ -114,11 +119,10 @@ class PrintService {
      * Watch a job until it finishes or is deleted.
      * options:
      *  - stopOnPause (bool): if true, resolve immediately with { state:'paused' } when job becomes Paused
-     *                         (queue code now generally passes false to keep tracking through pause)
      *
      * Resolves with:
-     *  - { success:true, state:'printed' }    when job disappears and last status not in DELETED_ON_DISAPPEAR
-     *  - { success:true, state:'deleted' }    when job disappears and last status was Deleting/Paused/Waiting
+     *  - { success:true, state:'printed' }    when job disappears and last status NOT in DELETED_ON_DISAPPEAR
+     *  - { success:true, state:'deleted' }    when job disappears and last status IN  DELETED_ON_DISAPPEAR
      *  - { success:true, state:'paused' }     if stopOnPause==true and job hits Paused
      */
     async watchJob(printerName, jobId, options = {}) {
