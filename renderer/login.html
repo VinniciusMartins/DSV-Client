@@ -1,0 +1,35 @@
+<!doctype html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>DSV-Client – Login</title>
+    <style>
+        body { font-family: system-ui, Arial, sans-serif; margin:0; background:#0f172a; color:#e2e8f0; display:flex; align-items:center; justify-content:center; height:100vh; }
+        .card { background:#111827; padding:24px; border-radius:12px; width: 360px; box-shadow: 0 10px 30px rgba(0,0,0,.3); }
+        h2 { margin:0 0 14px; font-weight:600; }
+        label { display:block; margin:10px 0 6px; font-size:14px; color:#cbd5e1; }
+        input { width:100%; padding:9px 10px; border-radius:8px; border:1px solid #334155; background:#0b1220; color:#e2e8f0; outline:none; }
+        input:focus { border-color:#3b82f6; }
+        button { margin-top:14px; width:100%; padding:10px 12px; border:0; border-radius:10px; background:#3b82f6; color:#fff; font-weight:600; cursor:pointer; }
+        button:disabled { opacity:.6; cursor:not-allowed; }
+        .msg { margin-top:12px; font-size:14px; }
+        .err { color:#fca5a5; }
+        .ok { color:#86efac; }
+        .small { font-size:12px; opacity:.8; }
+    </style>
+</head>
+<body>
+<div class="card">
+    <h2>Login</h2>
+    <form id="loginForm">
+        <label for="email">E-mail</label>
+        <input id="email" type="email" placeholder="you@example.com" required />
+        <label for="password">Password</label>
+        <input id="password" type="password" placeholder="••••••••" required />
+        <button id="loginBtn" type="submit">Sign in</button>
+        <div id="msg" class="msg small"></div>
+    </form>
+</div>
+<script src="./login.js"></script>
+</body>
+</html>

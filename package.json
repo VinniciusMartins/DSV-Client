@@ -25,6 +25,7 @@
       "preload.js",
       "controllers/**/*",
       "services/**/*",
+      "assets/**/*",
       "models/**/*",
       "renderer/**/*",
       "package.json"
