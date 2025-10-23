@@ -7,7 +7,7 @@ class AuthService {
     async login(email, password) {
         try {
             // Use global fetch (Node 18+/Electron)
-            const res = await fetch('http://18.228.150.85/api/electron-login', {
+            const res = await fetch('https://www.apinfautprd.com/api/electron-login', {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',

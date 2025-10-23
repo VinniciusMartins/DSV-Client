@@ -321,7 +321,7 @@ class QueueService {
 
     // ---------- API client ----------
     async _fetchNextFromApi(token) {
-        const url = 'http://18.228.150.85/api/printQueue';
+        const url = 'https://www.apinfautprd.com/api/printQueue';
 
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 15000); // 15s timeout
@@ -359,7 +359,7 @@ class QueueService {
     async _updatePdfStatusPrinted(apiId, token) {
         if (!apiId) return false;
 
-        const url = 'http://18.228.150.85/api/updatePdfStatus';
+        const url = 'https://www.apinfautprd.com/api/updatePdfStatus';
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 15000); // 15s timeout
 
