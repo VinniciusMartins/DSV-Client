@@ -36,3 +36,12 @@ contextBridge.exposeInMainWorld('QueueAPI', {
         return () => ipcRenderer.removeListener('queue:log', wrapped);
     }
 });
+
+contextBridge.exposeInMainWorld('ZebraAPI', {
+    list:   () => ipcRenderer.invoke('zebra:list'),
+    add:    (printer) => ipcRenderer.invoke('zebra:add', printer),
+    remove: (id) => ipcRenderer.invoke('zebra:remove', id),
+    test:   (id) => ipcRenderer.invoke('zebra:test', id),
+    print:  (id, zpl) => ipcRenderer.invoke('zebra:print', { id, zpl }),
+    printDirect: (host, port, zpl) => ipcRenderer.invoke('zebra:printDirect', { host, port, zpl })
+});

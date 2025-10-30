@@ -19,6 +19,10 @@ let removeTickListener = null;
 const jobBoxes = new Map();
 const tickLineNodes = new Map(); // one console line per job
 
+const zebraIp    = sel('zebraIp');
+const zebraPort  = sel('zebraPort');
+const testZebraBtn = sel('testZebraBtn');
+
 /* ---------- Log & Ticker helpers ---------- */
 function log(msg, cls='') {
     const ts = new Date().toLocaleTimeString();
@@ -246,6 +250,37 @@ reprintBtn?.addEventListener('click', async () => {
     }
     log(`Reprint outcome: ${r.state || 'done'}`);
 });
+
+async function testZebraPrint() {
+    const host = (zebraIp.value || '').trim();
+    const port = parseInt(zebraPort.value || '9100', 10) || 9100;
+    if (!host) { log('Enter a valid Zebra IP first', 'err'); return; }
+
+    const url = 'https://dev.apinfautprd.com/api/zebra/1/label';
+
+    try {
+        log(`Fetching ZPL from ${url} ...`);
+        // If your API requires auth, uncomment:
+        // const token = await getAuthToken();
+        // const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+
+        const res = await fetch(url);
+        if (!res.ok) {
+            log(`ZPL fetch failed: HTTP ${res.status}`, 'err');
+            return;
+        }
+        const zpl = await res.text();
+        log(`Sending ZPL to ${host}:${port} ...`);
+
+        const r = await window.ZebraAPI.printDirect(host, port, zpl);
+        if (r?.success) log(`✅ Zebra printed successfully at ${host}:${port}`);
+        else log(`❌ Print failed: ${r?.message || 'unknown'}`, 'err');
+    } catch (err) {
+        log(`❌ Error: ${err.message}`, 'err');
+    }
+}
+
+testZebraBtn?.addEventListener('click', testZebraPrint);
 
 /* ---------- Init ---------- */
 initialLoadPrinters();
