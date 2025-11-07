@@ -15,6 +15,10 @@ class AuthController {
         ipcMain.handle('auth:logout', async () => {
             return auth.logout();
         });
+
+        ipcMain.handle('auth:getApiConfig', async () => {
+            return AuthService.getApiConfig();
+        });
     }
 }
 

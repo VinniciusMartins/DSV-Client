@@ -1,10 +1,10 @@
 // preload.js
 const { contextBridge, ipcRenderer } = require('electron');
-
 contextBridge.exposeInMainWorld('AuthAPI', {
     login: (email, password) => ipcRenderer.invoke('auth:login', { email, password }),
     getUser: () => ipcRenderer.invoke('auth:getUser'),
-    logout: () => ipcRenderer.invoke('auth:logout')
+    logout: () => ipcRenderer.invoke('auth:logout'),
+    getApiConfig: () => ipcRenderer.invoke('auth:getApiConfig')
 });
 
 contextBridge.exposeInMainWorld('PrintAPI', {
@@ -45,3 +45,4 @@ contextBridge.exposeInMainWorld('ZebraAPI', {
     print:  (id, zpl) => ipcRenderer.invoke('zebra:print', { id, zpl }),
     printDirect: (host, port, zpl) => ipcRenderer.invoke('zebra:printDirect', { host, port, zpl })
 });
+

@@ -256,20 +256,51 @@ async function testZebraPrint() {
     const port = parseInt(zebraPort.value || '9100', 10) || 9100;
     if (!host) { log('Enter a valid Zebra IP first', 'err'); return; }
 
-    const url = 'https://dev.apinfautprd.com/api/zebra/1/label';
+    let url = 'https://www.apinfautprd.com/api/zebra/zebraQueue';
+    try {
+        const cfg = await window.AuthAPI?.getApiConfig?.();
+        const endpoints = cfg?.endpoints || cfg; // allow legacy shape
+        if (endpoints?.zebraQueue) {
+            url = endpoints.zebraQueue;
+        } else if (cfg?.baseUrl) {
+            const base = String(cfg.baseUrl).replace(/\/+$/, '');
+            url = `${base}/api/zebra/zebraQueue`;
+        }
+    } catch (err) {
+        console.warn('Failed to load API config, using default zebra URL', err);
+    }
 
     try {
         log(`Fetching ZPL from ${url} ...`);
-        // If your API requires auth, uncomment:
-        // const token = await getAuthToken();
-        // const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-
-        const res = await fetch(url);
+        const token = await getAuthToken();
+        const res = await fetch(url, {
+            headers: {
+                Accept: 'application/json, text/plain, */*',
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            }
+        });
         if (!res.ok) {
             log(`ZPL fetch failed: HTTP ${res.status}`, 'err');
             return;
         }
-        const zpl = await res.text();
+        const raw = await res.text();
+        let zpl = raw;
+        try {
+            const data = JSON.parse(raw);
+            if (data?.zpl) zpl = data.zpl;
+            else if (data?.label) zpl = data.label;
+            else if (data?.data) zpl = data.data;
+            else if (Array.isArray(data) && data.length) {
+                const first = data[0];
+                zpl = first?.zpl || first?.label || raw;
+            }
+        } catch {
+            // Not JSON; keep raw text as ZPL
+        }
+        if (!zpl) {
+            log('ZPL payload was empty.', 'err');
+            return;
+        }
         log(`Sending ZPL to ${host}:${port} ...`);
 
         const r = await window.ZebraAPI.printDirect(host, port, zpl);

@@ -1,5 +1,6 @@
 // services/queueService.js
 const PrintService = require('./printService');
+const AuthService = require('./authService');
 
 class QueueService {
     constructor(mainWindow) {
@@ -321,7 +322,8 @@ class QueueService {
 
     // ---------- API client ----------
     async _fetchNextFromApi(token) {
-        const url = 'https://www.apinfautprd.com/api/printQueue';
+        const { printQueue } = AuthService.getApiEndpoints();
+        const url = printQueue;
 
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 15000); // 15s timeout
@@ -359,7 +361,8 @@ class QueueService {
     async _updatePdfStatusPrinted(apiId, token) {
         if (!apiId) return false;
 
-        const url = 'https://www.apinfautprd.com/api/updatePdfStatus';
+        const { updatePdfStatus } = AuthService.getApiEndpoints();
+        const url = updatePdfStatus;
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 15000); // 15s timeout
 
