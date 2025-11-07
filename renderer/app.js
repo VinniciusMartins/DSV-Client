@@ -256,7 +256,13 @@ async function testZebraPrint() {
     const port = parseInt(zebraPort.value || '9100', 10) || 9100;
     if (!host) { log('Enter a valid Zebra IP first', 'err'); return; }
 
-    const url = window.ConfigAPI?.endpoints?.zebraQueue || 'https://www.apinfautprd.com/api/zebra/zebraQueue';
+    let url = 'https://www.apinfautprd.com/api/zebra/zebraQueue';
+    try {
+        const endpoints = await window.ConfigAPI?.getEndpoints?.();
+        if (endpoints?.zebraQueue) url = endpoints.zebraQueue;
+    } catch (err) {
+        console.warn('Failed to load endpoints, using default zebra URL', err);
+    }
 
     try {
         log(`Fetching ZPL from ${url} ...`);

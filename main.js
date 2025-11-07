@@ -5,6 +5,7 @@ const PrintController = require('./controllers/printController');
 const AuthController  = require('./controllers/authController');
 const QueueController = require('./controllers/queueController');
 const ZebraController = require('./controllers/zebraController');
+const ConfigController = require('./controllers/configController');
 
 let mainWindow;
 let tray = null;
@@ -45,6 +46,7 @@ async function createWindow() {
     AuthController.register(ipcMain);
     QueueController.register(ipcMain, mainWindow);
     ZebraController.register(ipcMain, app);
+    ConfigController.register(ipcMain);
 
     await mainWindow.loadFile(path.join(__dirname, 'renderer', 'login.html'));
 

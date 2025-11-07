@@ -43,9 +43,14 @@ function getApiRoot() {
     return API_ROOT;
 }
 
+function getEndpoints() {
+    return { ...endpoints };
+}
+
 module.exports = {
     DEFAULT_API_BASE_URL,
     endpoints,
+    getEndpoints,
     getApiBaseUrl,
     getApiRoot,
     resetApiBaseUrl,
