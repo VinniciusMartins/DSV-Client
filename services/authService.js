@@ -1,5 +1,5 @@
 const apiConfig = require('./apiConfig');
-const { setApiBaseUrl, resetApiBaseUrl } = apiConfig;
+const { endpoints, setApiBaseUrl, resetApiBaseUrl } = apiConfig;
 
 const DEV_LOGIN_EMAIL = 'dev@dev.com';
 const DEV_API_BASE_URL = 'https://dev.apinfautprd.com';
@@ -20,9 +20,7 @@ class AuthService {
             }
 
             // Use global fetch (Node 18+/Electron)
-            const { login: loginUrl } = apiConfig.getEndpoints();
-
-            const res = await fetch(loginUrl, {
+            const res = await fetch(endpoints.login, {
                 method: 'POST',
                 headers: {
                     'Accept': 'application/json',
