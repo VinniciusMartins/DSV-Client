@@ -138,6 +138,14 @@ async function getAuthToken() {
     } catch { return null; }
 }
 
+async function getApiBaseUrl() {
+    try {
+        const res = await window.AuthAPI.getUser();
+        if (res?.baseUrl) return res.baseUrl.replace(/\/+$/, '');
+    } catch {}
+    return 'https://www.apinfautprd.com/api';
+}
+
 /* ---------- Status translation ---------- */
 function friendlyFromInternal(status) {
     switch (String(status || '').toLowerCase()) {
@@ -256,20 +264,34 @@ async function testZebraPrint() {
     const port = parseInt(zebraPort.value || '9100', 10) || 9100;
     if (!host) { log('Enter a valid Zebra IP first', 'err'); return; }
 
-    const url = 'https://dev.apinfautprd.com/api/zebra/1/label';
+    const baseUrl = await getApiBaseUrl();
+    const url = `${baseUrl}/zebra/zebraQueue`;
 
     try {
         log(`Fetching ZPL from ${url} ...`);
-        // If your API requires auth, uncomment:
-        // const token = await getAuthToken();
-        // const res = await fetch(url, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
-
-        const res = await fetch(url);
+        const token = await getAuthToken();
+        const headers = token ? { Authorization: `Bearer ${token}` } : {};
+        const res = await fetch(url, { headers });
         if (!res.ok) {
             log(`ZPL fetch failed: HTTP ${res.status}`, 'err');
             return;
         }
-        const zpl = await res.text();
+        const payload = await res.text();
+        let zpl = payload;
+        try {
+            const parsed = JSON.parse(payload);
+            if (typeof parsed === 'string') zpl = parsed;
+            else if (parsed && typeof parsed === 'object') {
+                if (typeof parsed.zpl === 'string') zpl = parsed.zpl;
+                else if (typeof parsed.label === 'string') zpl = parsed.label;
+            }
+        } catch {/* payload not JSON; treat as raw ZPL */}
+
+        zpl = (zpl || '').trim();
+        if (!zpl) {
+            log('ZPL fetch succeeded but payload was empty.', 'err');
+            return;
+        }
         log(`Sending ZPL to ${host}:${port} ...`);
 
         const r = await window.ZebraAPI.printDirect(host, port, zpl);
