@@ -258,16 +258,10 @@ async function testZebraPrint() {
 
     let url = 'https://www.apinfautprd.com/api/zebra/zebraQueue';
     try {
-        const cfg = await window.AuthAPI?.getApiConfig?.();
-        const endpoints = cfg?.endpoints || cfg; // allow legacy shape
-        if (endpoints?.zebraQueue) {
-            url = endpoints.zebraQueue;
-        } else if (cfg?.baseUrl) {
-            const base = String(cfg.baseUrl).replace(/\/+$/, '');
-            url = `${base}/api/zebra/zebraQueue`;
-        }
+        const endpoints = await window.ConfigAPI?.getEndpoints?.();
+        if (endpoints?.zebraQueue) url = endpoints.zebraQueue;
     } catch (err) {
-        console.warn('Failed to load API config, using default zebra URL', err);
+        console.warn('Failed to load endpoints, using default zebra URL', err);
     }
 
     try {

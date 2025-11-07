@@ -1,6 +1,6 @@
 // services/queueService.js
 const PrintService = require('./printService');
-const AuthService = require('./authService');
+const { endpoints } = require('./apiConfig');
 
 class QueueService {
     constructor(mainWindow) {
@@ -322,8 +322,7 @@ class QueueService {
 
     // ---------- API client ----------
     async _fetchNextFromApi(token) {
-        const { printQueue } = AuthService.getApiEndpoints();
-        const url = printQueue;
+        const url = endpoints.printQueue;
 
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 15000); // 15s timeout
@@ -361,8 +360,7 @@ class QueueService {
     async _updatePdfStatusPrinted(apiId, token) {
         if (!apiId) return false;
 
-        const { updatePdfStatus } = AuthService.getApiEndpoints();
-        const url = updatePdfStatus;
+        const url = endpoints.updatePdfStatus;
         const ctrl = new AbortController();
         const timeout = setTimeout(() => ctrl.abort(), 15000); // 15s timeout
 
