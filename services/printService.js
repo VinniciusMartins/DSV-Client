@@ -11,13 +11,11 @@ const STATES = {
     UNKNOWN: 'Unknown'
 };
 
-// If a job disappears while last known state was one of these,
-// treat outcome as "deleted" (not "printed").
+// If a job disappears while we previously saw one of these states,
+// treat the outcome as "deleted" (otherwise assume it printed).
 const DELETED_ON_DISAPPEAR = new Set([
     STATES.DELETING,
-    STATES.PAUSED,
-    STATES.WAITING,
-    STATES.UNKNOWN // <— NEW: Unknown disappears => Deleted
+    STATES.PAUSED
 ]);
 
 class PrintService {
@@ -148,15 +146,25 @@ class PrintService {
         // polling loop
         return await new Promise((resolve) => {
             this._watchInterval = setInterval(async () => {
+                const { printerName, jobId } = this._watchingJob || {};
+
+                if (!this._watchInterval || printerName == null || jobId == null) {
+                    return;
+                }
+
                 let job = null;
                 try {
-                    job = await this.ps.getJobById(this._watchingJob.printerName, this._watchingJob.jobId);
+                    job = await this.ps.getJobById(printerName, jobId);
                 } catch { job = null; }
+
+                if (!this._watchInterval || this._watchingJob?.jobId !== jobId || this._watchingJob?.printerName !== printerName) {
+                    return;
+                }
 
                 if (!job) {
                     // Disappeared from spooler → decide printed vs deleted based on last known state
-                    const last = this._lastStatus || STATES.UNKNOWN;
-                    const treatAsDeleted = DELETED_ON_DISAPPEAR.has(last);
+                    const last = this._lastStatus;
+                    const treatAsDeleted = last ? DELETED_ON_DISAPPEAR.has(last) : false;
                     this.stopWatch();
                     return resolve({
                         success: true,
@@ -180,6 +188,8 @@ class PrintService {
     stopWatch() {
         if (this._watchInterval) clearInterval(this._watchInterval);
         this._watchInterval = null;
+        this._watchingJob = { printerName: null, jobId: null };
+        this._lastStatus = null;
     }
 }
 
