@@ -4,6 +4,18 @@ const emailEl = $('email');
 const passEl = $('password');
 const msgEl = $('msg');
 const btn = $('loginBtn');
+const versionEl = $('loginVersion');
+
+(async () => {
+    if (!versionEl || !window.AppInfo?.getVersion) return;
+    try {
+        const version = await window.AppInfo.getVersion();
+        if (version) {
+            versionEl.textContent = `Version ${version}`;
+            versionEl.title = `Version ${version}`;
+        }
+    } catch {}
+})();
 
 form.addEventListener('submit', async (e) => {
     e.preventDefault();

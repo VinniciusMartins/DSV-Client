@@ -10,6 +10,8 @@ let mainWindow;
 let tray = null;
 let isQuitting = false;
 
+ipcMain.handle('app:getVersion', () => app.getVersion());
+
 const ICON_PATH = path.join(__dirname, 'assets', 'printer.png');
 
 function createTray() {

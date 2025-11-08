@@ -45,3 +45,7 @@ contextBridge.exposeInMainWorld('ZebraAPI', {
     print:  (id, zpl) => ipcRenderer.invoke('zebra:print', { id, zpl }),
     printDirect: (host, port, zpl) => ipcRenderer.invoke('zebra:printDirect', { host, port, zpl })
 });
+
+contextBridge.exposeInMainWorld('AppInfo', {
+    getVersion: () => ipcRenderer.invoke('app:getVersion')
+});

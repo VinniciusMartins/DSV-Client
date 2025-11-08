@@ -58,6 +58,7 @@
         .brand { display: flex; align-items: center; gap: 12px; }
         .brand img { width: 26px; height: 26px; border-radius: 6px; filter: drop-shadow(0 4px 8px rgba(0,0,0,.3)); }
         .brand h1 { font-size: 16px; margin: 0; letter-spacing: .3px; font-weight: 600; }
+        .version-pill { font-size: 12px; color: var(--muted); }
         .user {
             display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 13px;
         }
@@ -211,6 +212,7 @@
         <div class="brand">
             <img src="../assets/printer.png" alt="DSV-Client" />
             <h1>DSV-Client <span class="badge">Print</span></h1>
+            <span id="appVersion" class="pill version-pill" aria-label="Application version">—</span>
         </div>
         <div class="user">
             <span id="userEmail" class="pill">Not signed in</span>
@@ -320,6 +322,7 @@
         try {
             const badge = document.getElementById('userEmail');
             const outBtn = document.getElementById('logoutBtn');
+            const versionBadge = document.getElementById('appVersion');
 
             if (window.AuthAPI?.getUser) {
                 const res = await window.AuthAPI.getUser();
@@ -330,6 +333,16 @@
                 } else {
                     badge.textContent = 'Not signed in';
                 }
+            }
+
+            if (versionBadge && window.AppInfo?.getVersion) {
+                try {
+                    const version = await window.AppInfo.getVersion();
+                    if (version) {
+                        versionBadge.textContent = `v${version}`;
+                        versionBadge.title = `Version ${version}`;
+                    }
+                } catch {}
             }
 
             outBtn?.addEventListener('click', async () => {
