@@ -2,6 +2,7 @@
 const fs = require('fs');
 const path = require('path');
 const net = require('net');
+const PowerShellService = require('../services/powershellService');
 
 function zebraStorePath(app) {
     const dir = app.getPath('userData');
@@ -19,6 +20,8 @@ function writeZebras(dir, file, list) {
     fs.writeFileSync(file, JSON.stringify(list, null, 2), 'utf8');
 }
 
+const psRawPrinter = new PowerShellService();
+
 function sendRaw9100(host, port, data) {
     return new Promise((resolve, reject) => {
         const socket = new net.Socket();
@@ -28,6 +31,113 @@ function sendRaw9100(host, port, data) {
         socket.on('error', reject);
         socket.on('close', resolve);
     });
+}
+
+async function sendRawToPrinter(printerName, zpl) {
+    const name = String(printerName || '').trim();
+    if (!name) throw new Error('printer name missing');
+    const payload = Buffer.from(zpl || '', 'utf8');
+    if (!payload.length) throw new Error('zpl empty');
+
+    const base64 = payload.toString('base64');
+    const nameEsc = name.replace(/`/g, '``').replace(/"/g, '""');
+    const script = `
+$ErrorActionPreference = 'Stop'
+$printer = "${nameEsc}"
+$bytes = [Convert]::FromBase64String('${base64}')
+if (-not ('Win32.RawPrinterHelper' -as [type])) {
+    Add-Type -Language CSharp -TypeDefinition @"
+using System;
+using System.Runtime.InteropServices;
+
+namespace Win32 {
+    public static class RawPrinterHelper {
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+        public class DOCINFO {
+            [MarshalAs(UnmanagedType.LPWStr)]
+            public string pDocName;
+            [MarshalAs(UnmanagedType.LPWStr)]
+            public string pOutputFile;
+            [MarshalAs(UnmanagedType.LPWStr)]
+            public string pDataType;
+        }
+
+        [DllImport("winspool.drv", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool OpenPrinter(string szPrinter, out IntPtr hPrinter, IntPtr pd);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        public static extern bool ClosePrinter(IntPtr hPrinter);
+
+        [DllImport("winspool.drv", SetLastError = true, CharSet = CharSet.Unicode)]
+        public static extern bool StartDocPrinter(IntPtr hPrinter, int level, DOCINFO di);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        public static extern bool EndDocPrinter(IntPtr hPrinter);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        public static extern bool StartPagePrinter(IntPtr hPrinter);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        public static extern bool EndPagePrinter(IntPtr hPrinter);
+
+        [DllImport("winspool.drv", SetLastError = true)]
+        public static extern bool WritePrinter(IntPtr hPrinter, byte[] data, int count, out int written);
+
+        public static void SendBytes(string printerName, byte[] bytes, string docName = null) {
+            if (string.IsNullOrWhiteSpace(printerName)) {
+                throw new ArgumentNullException(nameof(printerName));
+            }
+            if (bytes == null || bytes.Length == 0) {
+                throw new ArgumentNullException(nameof(bytes));
+            }
+
+            if (!OpenPrinter(printerName.Normalize(), out var hPrinter, IntPtr.Zero)) {
+                throw new System.ComponentModel.Win32Exception();
+            }
+
+            try {
+                var di = new DOCINFO {
+                    pDocName = string.IsNullOrWhiteSpace(docName) ? "ZPL Label" : docName,
+                    pDataType = "RAW"
+                };
+
+                if (!StartDocPrinter(hPrinter, 1, di)) {
+                    throw new System.ComponentModel.Win32Exception();
+                }
+
+                if (!StartPagePrinter(hPrinter)) {
+                    throw new System.ComponentModel.Win32Exception();
+                }
+
+                if (!WritePrinter(hPrinter, bytes, bytes.Length, out var written) || written != bytes.Length) {
+                    throw new System.ComponentModel.Win32Exception();
+                }
+
+                if (!EndPagePrinter(hPrinter)) {
+                    throw new System.ComponentModel.Win32Exception();
+                }
+
+                if (!EndDocPrinter(hPrinter)) {
+                    throw new System.ComponentModel.Win32Exception();
+                }
+            }
+            finally {
+                ClosePrinter(hPrinter);
+            }
+        }
+    }
+}
+"@
+}
+
+[Win32.RawPrinterHelper]::SendBytes($printer, $bytes, 'ZPL Label from DSV-Client')
+'OK'
+`.trim();
+
+    const result = await psRawPrinter.run(script);
+    if (!/OK/i.test(result || '')) {
+        throw new Error(result || 'Raw print failed');
+    }
 }
 
 module.exports = {
@@ -81,6 +191,15 @@ module.exports = {
             const p = parseInt(port, 10) || 9100;
             try {
                 await sendRaw9100(host, p, zpl);
+                return { success: true };
+            } catch (err) {
+                return { success: false, message: err.message || 'error' };
+            }
+        });
+
+        ipcMain.handle('zebra:printUsb', async (e, { printerName, zpl }) => {
+            try {
+                await sendRawToPrinter(printerName, zpl);
                 return { success: true };
             } catch (err) {
                 return { success: false, message: err.message || 'error' };

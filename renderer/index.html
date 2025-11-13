@@ -109,8 +109,10 @@
         .row { display: grid; gap: 12px; margin-bottom: 12px; }
         .grid-2 { grid-template-columns: 1fr 1fr; }
         .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .grid-span-2 { grid-column: span 2; }
         @media (max-width: 820px) {
             .grid-2, .grid-3 { grid-template-columns: 1fr; }
+            .grid-span-2 { grid-column: span 1; }
         }
 
         label { font-size: 13px; color: var(--muted); }
@@ -239,14 +241,9 @@
         </div>
         <div class="hd">
             <div class="row grid-3" style="margin-top: 8px;">
-                <div>
-                    <label for="zebraIp">Zebra IP</label>
-                    <input id="zebraIp" type="text" placeholder="192.168.1.50" />
-                </div>
-
-                <div>
-                    <label for="zebraPort">Port</label>
-                    <input id="zebraPort" type="text" value="9100" />
+                <div class="grid-span-2">
+                    <label for="zebraPrinter">Zebra printer</label>
+                    <select id="zebraPrinter" aria-label="Choose Zebra printer"></select>
                 </div>
 
                 <div class="toolbar" style="align-items:end;">
