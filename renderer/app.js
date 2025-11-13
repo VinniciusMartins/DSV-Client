@@ -143,6 +143,10 @@ async function getApiBaseUrl() {
         const res = await window.AuthAPI.getUser();
         if (res?.baseUrl) return res.baseUrl.replace(/\/+$/, '');
     } catch {}
+    try {
+        const res = await window.AuthAPI?.getBaseUrl?.();
+        if (res?.baseUrl) return res.baseUrl.replace(/\/+$/, '');
+    } catch {}
     return 'https://www.apinfautprd.com/api';
 }
 

@@ -52,6 +52,10 @@ class AuthService {
         return { success: true, user: this.user, token: this.token, baseUrl: getBaseApiUrl() };
     }
 
+    getBaseUrl() {
+        return { success: true, baseUrl: getBaseApiUrl() };
+    }
+
     async logout() {
         this.user = null;
         this.token = null;
