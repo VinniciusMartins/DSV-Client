@@ -12,6 +12,10 @@ class AuthController {
             return auth.getUser();
         });
 
+        ipcMain.handle('auth:getBaseUrl', async () => {
+            return auth.getBaseUrl();
+        });
+
         ipcMain.handle('auth:logout', async () => {
             return auth.logout();
         });
