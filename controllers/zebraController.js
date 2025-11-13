@@ -85,10 +85,10 @@ namespace Win32 {
 
         public static void SendBytes(string printerName, byte[] bytes, string docName = null) {
             if (string.IsNullOrWhiteSpace(printerName)) {
-                throw new ArgumentNullException(nameof(printerName));
+                throw new ArgumentNullException("printerName");
             }
             if (bytes == null || bytes.Length == 0) {
-                throw new ArgumentNullException(nameof(bytes));
+                throw new ArgumentNullException("bytes");
             }
 
             IntPtr hPrinter;
