@@ -91,7 +91,8 @@ namespace Win32 {
                 throw new ArgumentNullException(nameof(bytes));
             }
 
-            if (!OpenPrinter(printerName.Normalize(), out var hPrinter, IntPtr.Zero)) {
+            IntPtr hPrinter;
+            if (!OpenPrinter(printerName.Normalize(), out hPrinter, IntPtr.Zero)) {
                 throw new System.ComponentModel.Win32Exception();
             }
 
