@@ -19,8 +19,7 @@ let removeTickListener = null;
 const jobBoxes = new Map();
 const tickLineNodes = new Map(); // one console line per job
 
-const zebraIp    = sel('zebraIp');
-const zebraPort  = sel('zebraPort');
+const zebraPrinterSelect = sel('zebraPrinter');
 const testZebraBtn = sel('testZebraBtn');
 
 /* ---------- Log & Ticker helpers ---------- */
@@ -93,15 +92,64 @@ function renderJobBox(jobId, { statusInternal, labelOverride }) {
 /* ---------- Printer discovery (with backoff) ---------- */
 async function loadPrinters() {
     const printers = await window.PrintAPI.getPrinters();
-    printerSelect.innerHTML = '';
-    (printers || []).forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.name;
-        opt.textContent = `${p.name}${p.isDefault ? ' (default)' : ''}`;
-        printerSelect.appendChild(opt);
+    const list = Array.isArray(printers) ? printers : [];
+
+    const prevQueuePrinter = printerSelect?.value || '';
+    const prevZebraPrinter = zebraPrinterSelect?.value || '';
+
+    const resolveName = (p) => p?.name || 'Unnamed printer';
+
+    if (printerSelect) {
+        printerSelect.innerHTML = '';
+    }
+    if (zebraPrinterSelect) {
+        zebraPrinterSelect.innerHTML = '';
+        const placeholder = document.createElement('option');
+        placeholder.value = '';
+        placeholder.textContent = 'Select Zebra printer';
+        placeholder.disabled = true;
+        placeholder.hidden = true;
+        zebraPrinterSelect.appendChild(placeholder);
+    }
+
+    let zebraPreselect = prevZebraPrinter;
+    if (!zebraPreselect) {
+        const zebraCandidate = list.find(p => /zebra|zd|zpl/i.test(resolveName(p)));
+        if (zebraCandidate) zebraPreselect = resolveName(zebraCandidate);
+    }
+
+    if (zebraPrinterSelect) {
+        const placeholder = zebraPrinterSelect.querySelector('option[value=""]');
+        if (placeholder) placeholder.selected = !zebraPreselect;
+    }
+
+    list.forEach(p => {
+        const name = resolveName(p);
+        if (printerSelect) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = `${name}${p?.isDefault ? ' (default)' : ''}`;
+            if (prevQueuePrinter && prevQueuePrinter === name) opt.selected = true;
+            printerSelect.appendChild(opt);
+        }
+
+        if (zebraPrinterSelect) {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = `${name}${/zebra|zd|zpl/i.test(name) ? ' 🦓' : ''}`;
+            if ((prevZebraPrinter && prevZebraPrinter === name) || (!prevZebraPrinter && zebraPreselect === name)) {
+                opt.selected = true;
+            }
+            zebraPrinterSelect.appendChild(opt);
+        }
     });
-    refreshInfo.textContent = `Loaded ${printers?.length || 0} printers.`;
-    log(`Loaded ${printers?.length || 0} printers.`);
+
+    if (zebraPrinterSelect && !zebraPrinterSelect.value) {
+        zebraPrinterSelect.selectedIndex = 0;
+    }
+
+    refreshInfo.textContent = `Loaded ${list.length} printers.`;
+    log(`Loaded ${list.length} printers.`);
 }
 const delay = (ms) => new Promise(r => setTimeout(r, ms));
 async function loadPrintersWithBackoff({ attempts = 5, baseDelay = 400, factor = 1.8, jitter = true } = {}) {
@@ -264,9 +312,8 @@ reprintBtn?.addEventListener('click', async () => {
 });
 
 async function testZebraPrint() {
-    const host = (zebraIp.value || '').trim();
-    const port = parseInt(zebraPort.value || '9100', 10) || 9100;
-    if (!host) { log('Enter a valid Zebra IP first', 'err'); return; }
+    const printerName = (zebraPrinterSelect?.value || '').trim();
+    if (!printerName) { log('Select a Zebra printer first', 'err'); return; }
 
     const baseUrl = await getApiBaseUrl();
     const url = `${baseUrl}/zebra/zebraQueue`;
@@ -296,10 +343,10 @@ async function testZebraPrint() {
             log('ZPL fetch succeeded but payload was empty.', 'err');
             return;
         }
-        log(`Sending ZPL to ${host}:${port} ...`);
+        log(`Sending ZPL to ${printerName} (raw USB)...`);
 
-        const r = await window.ZebraAPI.printDirect(host, port, zpl);
-        if (r?.success) log(`✅ Zebra printed successfully at ${host}:${port}`);
+        const r = await window.ZebraAPI.printUsb(printerName, zpl);
+        if (r?.success) log(`✅ Zebra printed successfully on ${printerName}`);
         else log(`❌ Print failed: ${r?.message || 'unknown'}`, 'err');
     } catch (err) {
         log(`❌ Error: ${err.message}`, 'err');

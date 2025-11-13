@@ -44,7 +44,8 @@ contextBridge.exposeInMainWorld('ZebraAPI', {
     remove: (id) => ipcRenderer.invoke('zebra:remove', id),
     test:   (id) => ipcRenderer.invoke('zebra:test', id),
     print:  (id, zpl) => ipcRenderer.invoke('zebra:print', { id, zpl }),
-    printDirect: (host, port, zpl) => ipcRenderer.invoke('zebra:printDirect', { host, port, zpl })
+    printDirect: (host, port, zpl) => ipcRenderer.invoke('zebra:printDirect', { host, port, zpl }),
+    printUsb: (printerName, zpl) => ipcRenderer.invoke('zebra:printUsb', { printerName, zpl })
 });
 
 contextBridge.exposeInMainWorld('AppInfo', {
