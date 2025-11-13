@@ -110,7 +110,8 @@ namespace Win32 {
                     throw new System.ComponentModel.Win32Exception();
                 }
 
-                if (!WritePrinter(hPrinter, bytes, bytes.Length, out var written) || written != bytes.Length) {
+                int written;
+                if (!WritePrinter(hPrinter, bytes, bytes.Length, out written) || written != bytes.Length) {
                     throw new System.ComponentModel.Win32Exception();
                 }
 
