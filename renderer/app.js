@@ -341,23 +341,7 @@ function syncZebraToggleAvailability() {
     }
 }
 
-function normalizeZebraJob(data) {
-    if (!data) return null;
-    if (typeof data === 'string') return { zpl: data };
-    if (typeof data === 'object') {
-        const zpl = data.zpl || data.label || '';
-        if (!zpl) return null;
-        return {
-            zpl,
-            id: data.id,
-            name: data.name || data.filename || data.labelName,
-            filename: data.filename
-        };
-    }
-    return null;
-}
-
-async function fetchZebraJobs(baseUrl, token) {
+async function fetchNextZebraJob(baseUrl, token) {
     const url = `${baseUrl}/zebra/zebraQueue`;
 
     const ctrl = new AbortController();
@@ -374,21 +358,21 @@ async function fetchZebraJobs(baseUrl, token) {
         });
 
         const text = await res.text();
-        if (res.status === 204 || res.status === 404) return [];
+        if (res.status === 204 || res.status === 404) return null;
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${text || 'unknown error'}`);
-        if (!text) return [];
+        if (!text) return null;
 
+        let fallback = text;
         try {
             const parsed = JSON.parse(text);
-            if (Array.isArray(parsed)) {
-                return parsed.map(normalizeZebraJob).filter(Boolean);
+            if (typeof parsed === 'string') fallback = parsed;
+            else if (parsed && typeof parsed === 'object') {
+                const zpl = parsed.zpl || parsed.label || '';
+                return { zpl, id: parsed.id, name: parsed.name || parsed.filename || parsed.labelName, filename: parsed.filename };
             }
-            const single = normalizeZebraJob(parsed);
-            if (single) return [single];
         } catch { /* payload not JSON */ }
 
-        const fallback = normalizeZebraJob(text);
-        return fallback ? [fallback] : [];
+        return { zpl: fallback };
     } finally {
         clearTimeout(timeout);
     }
@@ -407,9 +391,9 @@ async function startZebraListening() {
 
     zebraLoopPromise = (async () => {
         while (!zebraListenToken.stop) {
-            let jobs = [];
+            let job = null;
             try {
-                jobs = await fetchZebraJobs(baseUrl, token);
+                job = await fetchNextZebraJob(baseUrl, token);
             } catch (err) {
                 log(`[Zebra] API error: ${err?.message || err}`, 'err');
                 await delay(2000);
@@ -417,22 +401,19 @@ async function startZebraListening() {
             }
 
             if (zebraListenToken.stop) break;
-            if (!Array.isArray(jobs) || jobs.length === 0) { await delay(1400); continue; }
+            if (!job || !job.zpl) { await delay(1400); continue; }
 
-            for (const job of jobs) {
-                if (zebraListenToken.stop) break;
-                const zpl = String(job?.zpl || '').trim();
-                if (!zpl) { log('[Zebra] Empty ZPL payload; skipping.', 'err'); await delay(500); continue; }
+            const zpl = String(job.zpl || '').trim();
+            if (!zpl) { log('[Zebra] Empty ZPL payload; skipping.', 'err'); await delay(500); continue; }
 
-                const label = job.filename || job.name || job.id || 'label';
-                setZebraBadge('printing');
-                log(`[Zebra] Printing ${label}…`);
-                const res = await window.ZebraAPI.printUsb(printerName, zpl);
-                if (res?.success) log(`[Zebra] Printed ${label}.`);
-                else log(`[Zebra] Print failed: ${res?.message || 'unknown'}`, 'err');
-                setZebraBadge('listening');
-                await delay(400);
-            }
+            const label = job.filename || job.name || job.id || 'label';
+            setZebraBadge('printing');
+            log(`[Zebra] Printing ${label}…`);
+            const res = await window.ZebraAPI.printUsb(printerName, zpl);
+            if (res?.success) log(`[Zebra] Printed ${label}.`);
+            else log(`[Zebra] Print failed: ${res?.message || 'unknown'}`, 'err');
+            setZebraBadge('listening');
+            await delay(400);
         }
     })().finally(() => {
         setZebraBadge('stopped', zebraListenToken?.stop ? 'manual' : 'done');

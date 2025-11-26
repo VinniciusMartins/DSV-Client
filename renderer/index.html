@@ -122,39 +122,9 @@
             background: var(--panel-2); color: var(--text);
             outline: none; transition: .16s ease;
         }
-        .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; color: var(--muted); font-size: 13px; position: relative; }
-        .switch input { position: absolute; opacity: 0; inset: 0; cursor: pointer; }
-        .switch .switch-slider {
-            position: relative;
-            width: 46px;
-            height: 26px;
-            background: var(--panel-2);
-            border: 1px solid var(--border);
-            border-radius: 999px;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 4px 10px rgba(0,0,0,.35);
-            transition: background .18s ease, border-color .18s ease;
-        }
-        .switch .switch-slider::after {
-            content: '';
-            position: absolute;
-            top: 3px;
-            left: 3px;
-            width: 20px;
-            height: 20px;
-            background: #fff;
-            border-radius: 50%;
-            box-shadow: 0 2px 6px rgba(0,0,0,.25);
-            transition: transform .18s ease;
-        }
-        .switch input:checked + .switch-slider {
-            background: linear-gradient(180deg, var(--primary), var(--primary-600));
-            border-color: transparent;
-        }
-        .switch input:checked + .switch-slider::after { transform: translateX(20px); }
-        .switch input:focus-visible + .switch-slider { box-shadow: var(--ring); }
-        .switch input:disabled + .switch-slider { opacity: .5; cursor: not-allowed; }
-        .switch input:disabled ~ .switch-text { opacity: .6; cursor: not-allowed; }
-        .switch .switch-text { color: var(--text); font-weight: 600; user-select: none; }
+        .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--muted); font-size: 13px; }
+        .switch input { width: 18px; height: 18px; accent-color: var(--primary); }
+        .switch span { color: var(--text); font-weight: 600; }
         input::placeholder { color: #9fb0db; opacity: .65; }
         select:focus, input:focus { box-shadow: var(--ring); }
 
@@ -282,8 +252,7 @@
                 <div class="toolbar" style="align-items:end;">
                     <label class="switch" for="zebraListenSwitch">
                         <input id="zebraListenSwitch" type="checkbox" />
-                        <span class="switch-slider" aria-hidden="true"></span>
-                        <span class="switch-text">Listen to Zebra API</span>
+                        <span>Listen to Zebra API</span>
                     </label>
                     <span id="zebraQueueBadge" class="pill">Zebra: idle</span>
                 </div>
