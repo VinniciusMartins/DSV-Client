@@ -193,16 +193,30 @@ async function getAuthToken() {
     } catch { return null; }
 }
 
+function sanitizeBaseUrl(url) {
+    if (!url || typeof url !== 'string') return 'https://www.apinfautprd.com/api';
+    const trimmed = url.trim();
+    if (!trimmed) return 'https://www.apinfautprd.com/api';
+    return trimmed.replace(/\/+$/, '');
+}
+
 async function getApiBaseUrl() {
     try {
         const res = await window.AuthAPI.getUser();
-        if (res?.baseUrl) return res.baseUrl.replace(/\/+$/, '');
+        if (res?.baseUrl) return sanitizeBaseUrl(res.baseUrl);
     } catch {}
     try {
         const res = await window.AuthAPI?.getBaseUrl?.();
-        if (res?.baseUrl) return res.baseUrl.replace(/\/+$/, '');
+        if (res?.baseUrl) return sanitizeBaseUrl(res.baseUrl);
     } catch {}
     return 'https://www.apinfautprd.com/api';
+}
+
+async function buildApiUrl(path = '') {
+    const base = await getApiBaseUrl();
+    if (!path) return base;
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${base}${normalizedPath}`;
 }
 
 /* ---------- Status translation ---------- */
@@ -342,8 +356,8 @@ function syncZebraToggleAvailability() {
     }
 }
 
-async function fetchNextZebraJob(baseUrl, token) {
-    const url = `${baseUrl}/zebra/zebraQueue`;
+async function fetchNextZebraJob(token) {
+    const url = await buildApiUrl('/zebra/zebraQueue');
 
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 15000);
@@ -379,7 +393,7 @@ async function fetchNextZebraJob(baseUrl, token) {
     }
 }
 
-async function processZebraJob(job, printerName, baseUrl, token) {
+async function processZebraJob(job, printerName, token) {
     const zpl = String(job?.zpl || '').trim();
     if (!zpl) { log('[Zebra] Empty ZPL payload; skipping.', 'err'); await delay(500); return; }
 
@@ -394,17 +408,17 @@ async function processZebraJob(job, printerName, baseUrl, token) {
     else log(`[Zebra] Print failed: ${res?.message || 'unknown'}`, 'err');
 
     if (success && job?.id) {
-        await updateZebraStatusPrinted(baseUrl, token, job.id);
+        await updateZebraStatusPrinted(token, job.id);
     }
 
     setZebraBadge('listening');
     await delay(success ? 800 : 400);
 }
 
-async function updateZebraStatusPrinted(baseUrl, token, apiId) {
+async function updateZebraStatusPrinted(token, apiId) {
     if (!apiId) return false;
 
-    const url = `${baseUrl}/updateZebraStatus`;
+    const url = await buildApiUrl('/updatePdfStatus');
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 15000);
 
@@ -441,7 +455,6 @@ async function startZebraListening() {
     if (zebraListenToken) return;
 
     const token = await getAuthToken();
-    const baseUrl = await getApiBaseUrl();
     zebraListenToken = { stop: false };
     zebraIdleLogged = false;
     setZebraBadge('listening');
@@ -451,7 +464,7 @@ async function startZebraListening() {
         while (!zebraListenToken.stop) {
             let job = null;
             try {
-                job = await fetchNextZebraJob(baseUrl, token);
+                job = await fetchNextZebraJob(token);
             } catch (err) {
                 log(`[Zebra] API error: ${err?.message || err}`, 'err');
                 await delay(2000);
@@ -470,7 +483,7 @@ async function startZebraListening() {
             }
             zebraIdleLogged = false;
 
-            await processZebraJob(job, printerName, baseUrl, token);
+            await processZebraJob(job, printerName, token);
         }
     })().finally(() => {
         setZebraBadge('stopped', zebraListenToken?.stop ? 'manual' : 'done');
