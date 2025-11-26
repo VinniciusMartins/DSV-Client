@@ -20,7 +20,11 @@ const jobBoxes = new Map();
 const tickLineNodes = new Map(); // one console line per job
 
 const zebraPrinterSelect = sel('zebraPrinter');
-const testZebraBtn = sel('testZebraBtn');
+const zebraListenSwitch = sel('zebraListenSwitch');
+const zebraQueueBadge = sel('zebraQueueBadge');
+
+let zebraListenToken = null; // { stop: boolean }
+let zebraLoopPromise = null;
 
 /* ---------- Log & Ticker helpers ---------- */
 function log(msg, cls='') {
@@ -147,6 +151,8 @@ async function loadPrinters() {
     if (zebraPrinterSelect && !zebraPrinterSelect.value) {
         zebraPrinterSelect.selectedIndex = 0;
     }
+
+    syncZebraToggleAvailability();
 
     refreshInfo.textContent = `Loaded ${list.length} printers.`;
     log(`Loaded ${list.length} printers.`);
@@ -311,49 +317,129 @@ reprintBtn?.addEventListener('click', async () => {
     log(`Reprint outcome: ${r.state || 'done'}`);
 });
 
-async function testZebraPrint() {
-    const printerName = (zebraPrinterSelect?.value || '').trim();
-    if (!printerName) { log('Select a Zebra printer first', 'err'); return; }
+function setZebraBadge(state, reason = '') {
+    if (!zebraQueueBadge) return;
+    const map = {
+        idle: 'Zebra: idle',
+        listening: 'Zebra: listening…',
+        printing: 'Zebra: printing…',
+        stopped: `Zebra: stopped${reason ? ` (${reason})` : ''}`
+    };
+    zebraQueueBadge.textContent = map[state] || `Zebra: ${state}`;
+}
 
-    const baseUrl = await getApiBaseUrl();
-    const url = `${baseUrl}/zebra/zebraQueue`;
-
-    try {
-        log(`Fetching ZPL from ${url} ...`);
-        const token = await getAuthToken();
-        const headers = token ? { Authorization: `Bearer ${token}` } : {};
-        const res = await fetch(url, { headers });
-        if (!res.ok) {
-            log(`ZPL fetch failed: HTTP ${res.status}`, 'err');
-            return;
-        }
-        const payload = await res.text();
-        let zpl = payload;
-        try {
-            const parsed = JSON.parse(payload);
-            if (typeof parsed === 'string') zpl = parsed;
-            else if (parsed && typeof parsed === 'object') {
-                if (typeof parsed.zpl === 'string') zpl = parsed.zpl;
-                else if (typeof parsed.label === 'string') zpl = parsed.label;
-            }
-        } catch {/* payload not JSON; treat as raw ZPL */}
-
-        zpl = (zpl || '').trim();
-        if (!zpl) {
-            log('ZPL fetch succeeded but payload was empty.', 'err');
-            return;
-        }
-        log(`Sending ZPL to ${printerName} (raw USB)...`);
-
-        const r = await window.ZebraAPI.printUsb(printerName, zpl);
-        if (r?.success) log(`✅ Zebra printed successfully on ${printerName}`);
-        else log(`❌ Print failed: ${r?.message || 'unknown'}`, 'err');
-    } catch (err) {
-        log(`❌ Error: ${err.message}`, 'err');
+function syncZebraToggleAvailability() {
+    const hasPrinter = !!(zebraPrinterSelect?.value || '').trim();
+    if (!zebraListenSwitch) return;
+    zebraListenSwitch.disabled = !hasPrinter;
+    if (!hasPrinter && zebraListenSwitch.checked) {
+        zebraListenSwitch.checked = false;
+    }
+    if (!hasPrinter) {
+        stopZebraListening('no-printer');
+        setZebraBadge('idle');
     }
 }
 
-testZebraBtn?.addEventListener('click', testZebraPrint);
+async function fetchNextZebraJob(baseUrl, token) {
+    const url = `${baseUrl}/zebra/zebraQueue`;
+
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 15000);
+
+    try {
+        const res = await fetch(url, {
+            method: 'GET',
+            headers: {
+                'Accept': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
+            signal: ctrl.signal
+        });
+
+        const text = await res.text();
+        if (res.status === 204 || res.status === 404) return null;
+        if (!res.ok) throw new Error(`HTTP ${res.status}: ${text || 'unknown error'}`);
+        if (!text) return null;
+
+        let fallback = text;
+        try {
+            const parsed = JSON.parse(text);
+            if (typeof parsed === 'string') fallback = parsed;
+            else if (parsed && typeof parsed === 'object') {
+                const zpl = parsed.zpl || parsed.label || '';
+                return { zpl, id: parsed.id, name: parsed.name || parsed.filename || parsed.labelName, filename: parsed.filename };
+            }
+        } catch { /* payload not JSON */ }
+
+        return { zpl: fallback };
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
+async function startZebraListening() {
+    const printerName = (zebraPrinterSelect?.value || '').trim();
+    if (!printerName) { if (zebraListenSwitch) zebraListenSwitch.checked = false; log('Select a Zebra printer first', 'err'); return; }
+    if (zebraListenToken) return;
+
+    const token = await getAuthToken();
+    const baseUrl = await getApiBaseUrl();
+    zebraListenToken = { stop: false };
+    setZebraBadge('listening');
+    log('[Zebra] Listening for labels…');
+
+    zebraLoopPromise = (async () => {
+        while (!zebraListenToken.stop) {
+            let job = null;
+            try {
+                job = await fetchNextZebraJob(baseUrl, token);
+            } catch (err) {
+                log(`[Zebra] API error: ${err?.message || err}`, 'err');
+                await delay(2000);
+                continue;
+            }
+
+            if (zebraListenToken.stop) break;
+            if (!job || !job.zpl) { await delay(1400); continue; }
+
+            const zpl = String(job.zpl || '').trim();
+            if (!zpl) { log('[Zebra] Empty ZPL payload; skipping.', 'err'); await delay(500); continue; }
+
+            const label = job.filename || job.name || job.id || 'label';
+            setZebraBadge('printing');
+            log(`[Zebra] Printing ${label}…`);
+            const res = await window.ZebraAPI.printUsb(printerName, zpl);
+            if (res?.success) log(`[Zebra] Printed ${label}.`);
+            else log(`[Zebra] Print failed: ${res?.message || 'unknown'}`, 'err');
+            setZebraBadge('listening');
+            await delay(400);
+        }
+    })().finally(() => {
+        setZebraBadge('stopped', zebraListenToken?.stop ? 'manual' : 'done');
+        zebraListenToken = null;
+        zebraLoopPromise = null;
+        if (zebraListenSwitch) zebraListenSwitch.checked = false;
+        log('[Zebra] Listener stopped.');
+    });
+}
+
+async function stopZebraListening(reason = 'manual') {
+    if (!zebraListenToken) { setZebraBadge('stopped', reason); return; }
+    zebraListenToken.stop = true;
+    if (zebraLoopPromise) await zebraLoopPromise;
+    setZebraBadge('stopped', reason);
+}
+
+zebraListenSwitch?.addEventListener('change', (evt) => {
+    if (evt.target.checked) startZebraListening();
+    else stopZebraListening('toggle-off');
+});
+
+zebraPrinterSelect?.addEventListener('change', () => {
+    syncZebraToggleAvailability();
+});
 
 /* ---------- Init ---------- */
 initialLoadPrinters();
+syncZebraToggleAvailability();
