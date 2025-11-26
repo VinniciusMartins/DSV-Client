@@ -379,6 +379,28 @@ async function fetchNextZebraJob(baseUrl, token) {
     }
 }
 
+async function processZebraJob(job, printerName, baseUrl, token) {
+    const zpl = String(job?.zpl || '').trim();
+    if (!zpl) { log('[Zebra] Empty ZPL payload; skipping.', 'err'); await delay(500); return; }
+
+    const label = job?.filename || job?.name || job?.id || 'label';
+    setZebraBadge('printing');
+    log(`[Zebra] Printing ${label}…`);
+
+    const res = await window.ZebraAPI.printUsb(printerName, zpl);
+    const success = !!res?.success;
+
+    if (success) log(`[Zebra] Printed ${label}.`);
+    else log(`[Zebra] Print failed: ${res?.message || 'unknown'}`, 'err');
+
+    if (success && job?.id) {
+        await updateZebraStatusPrinted(baseUrl, token, job.id);
+    }
+
+    setZebraBadge('listening');
+    await delay(success ? 800 : 400);
+}
+
 async function updateZebraStatusPrinted(baseUrl, token, apiId) {
     if (!apiId) return false;
 
@@ -448,20 +470,7 @@ async function startZebraListening() {
             }
             zebraIdleLogged = false;
 
-            const zpl = String(job.zpl || '').trim();
-            if (!zpl) { log('[Zebra] Empty ZPL payload; skipping.', 'err'); await delay(500); continue; }
-
-            const label = job.filename || job.name || job.id || 'label';
-            setZebraBadge('printing');
-            log(`[Zebra] Printing ${label}…`);
-            const res = await window.ZebraAPI.printUsb(printerName, zpl);
-            if (res?.success) log(`[Zebra] Printed ${label}.`);
-            else log(`[Zebra] Print failed: ${res?.message || 'unknown'}`, 'err');
-            if (res?.success && job?.id) {
-                await updateZebraStatusPrinted(baseUrl, token, job.id);
-            }
-            setZebraBadge('listening');
-            await delay(400);
+            await processZebraJob(job, printerName, baseUrl, token);
         }
     })().finally(() => {
         setZebraBadge('stopped', zebraListenToken?.stop ? 'manual' : 'done');
