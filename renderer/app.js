@@ -372,7 +372,7 @@ async function fetchNextZebraJob(token) {
             signal: ctrl.signal
         });
 
-        const zebraId = res.headers.get('x-zebra-id') || null;
+        const zebraId = res.headers.get('X-Zebra-Id') || null;
         const text = await res.text();
         if (res.status === 204 || res.status === 404) return null;
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${text || 'unknown error'}`);
@@ -419,7 +419,7 @@ async function processZebraJob(job, printerName, token) {
 async function updateZebraStatusPrinted(token, apiId) {
     if (!apiId) return false;
 
-    const url = await buildApiUrl('/api/updateZebraStatus');
+    const url = await buildApiUrl('/updateZebraStatus');
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 15000);
 
