@@ -25,6 +25,7 @@ const zebraQueueBadge = sel('zebraQueueBadge');
 
 let zebraListenToken = null; // { stop: boolean }
 let zebraLoopPromise = null;
+let zebraIdleLogged = false;
 
 /* ---------- Log & Ticker helpers ---------- */
 function log(msg, cls='') {
@@ -378,6 +379,40 @@ async function fetchNextZebraJob(baseUrl, token) {
     }
 }
 
+async function updateZebraStatusPrinted(baseUrl, token, apiId) {
+    if (!apiId) return false;
+
+    const url = `${baseUrl}/updateZebraStatus`;
+    const ctrl = new AbortController();
+    const timeout = setTimeout(() => ctrl.abort(), 15000);
+
+    try {
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                ...(token ? { Authorization: `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({ id: apiId, status: 'Impresso' }),
+            signal: ctrl.signal
+        });
+
+        if (!res.ok) {
+            const txt = await res.text().catch(() => '');
+            throw new Error(`HTTP ${res.status}: ${txt || 'unknown error'}`);
+        }
+
+        log(`[Zebra] Status atualizado p/ Impresso (id=${apiId}).`);
+        return true;
+    } catch (err) {
+        log(`[Zebra] Falha ao atualizar status (id=${apiId}): ${err?.message || err}`, 'err');
+        return false;
+    } finally {
+        clearTimeout(timeout);
+    }
+}
+
 async function startZebraListening() {
     const printerName = (zebraPrinterSelect?.value || '').trim();
     if (!printerName) { if (zebraListenSwitch) zebraListenSwitch.checked = false; log('Select a Zebra printer first', 'err'); return; }
@@ -386,6 +421,7 @@ async function startZebraListening() {
     const token = await getAuthToken();
     const baseUrl = await getApiBaseUrl();
     zebraListenToken = { stop: false };
+    zebraIdleLogged = false;
     setZebraBadge('listening');
     log('[Zebra] Listening for labels…');
 
@@ -401,7 +437,16 @@ async function startZebraListening() {
             }
 
             if (zebraListenToken.stop) break;
-            if (!job || !job.zpl) { await delay(1400); continue; }
+            if (!job || !job.zpl) {
+                setZebraBadge('idle');
+                if (!zebraIdleLogged) {
+                    log('[Zebra] Queue idle.');
+                    zebraIdleLogged = true;
+                }
+                await delay(1400);
+                continue;
+            }
+            zebraIdleLogged = false;
 
             const zpl = String(job.zpl || '').trim();
             if (!zpl) { log('[Zebra] Empty ZPL payload; skipping.', 'err'); await delay(500); continue; }
@@ -412,6 +457,9 @@ async function startZebraListening() {
             const res = await window.ZebraAPI.printUsb(printerName, zpl);
             if (res?.success) log(`[Zebra] Printed ${label}.`);
             else log(`[Zebra] Print failed: ${res?.message || 'unknown'}`, 'err');
+            if (res?.success && job?.id) {
+                await updateZebraStatusPrinted(baseUrl, token, job.id);
+            }
             setZebraBadge('listening');
             await delay(400);
         }
