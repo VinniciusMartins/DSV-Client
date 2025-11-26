@@ -122,6 +122,9 @@
             background: var(--panel-2); color: var(--text);
             outline: none; transition: .16s ease;
         }
+        .switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; color: var(--muted); font-size: 13px; }
+        .switch input { width: 18px; height: 18px; accent-color: var(--primary); }
+        .switch span { color: var(--text); font-weight: 600; }
         input::placeholder { color: #9fb0db; opacity: .65; }
         select:focus, input:focus { box-shadow: var(--ring); }
 
@@ -247,7 +250,11 @@
                 </div>
 
                 <div class="toolbar" style="align-items:end;">
-                    <button id="testZebraBtn" class="btn btn-primary" type="button">🧪 Test Zebra Print</button>
+                    <label class="switch" for="zebraListenSwitch">
+                        <input id="zebraListenSwitch" type="checkbox" />
+                        <span>Listen to Zebra API</span>
+                    </label>
+                    <span id="zebraQueueBadge" class="pill">Zebra: idle</span>
                 </div>
             </div>
         </div>
