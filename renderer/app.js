@@ -372,6 +372,7 @@ async function fetchNextZebraJob(token) {
             signal: ctrl.signal
         });
 
+        const zebraId = res.headers.get('x-zebra-id') || null;
         const text = await res.text();
         if (res.status === 204 || res.status === 404) return null;
         if (!res.ok) throw new Error(`HTTP ${res.status}: ${text || 'unknown error'}`);
@@ -383,11 +384,11 @@ async function fetchNextZebraJob(token) {
             if (typeof parsed === 'string') fallback = parsed;
             else if (parsed && typeof parsed === 'object') {
                 const zpl = parsed.zpl || parsed.label || '';
-                return { zpl, id: parsed.id, name: parsed.name || parsed.filename || parsed.labelName, filename: parsed.filename };
+                return { zpl, id: zebraId || parsed.id, name: parsed.name || parsed.filename || parsed.labelName, filename: parsed.filename };
             }
         } catch { /* payload not JSON */ }
 
-        return { zpl: fallback };
+        return { zpl: fallback, id: zebraId };
     } finally {
         clearTimeout(timeout);
     }
@@ -418,7 +419,7 @@ async function processZebraJob(job, printerName, token) {
 async function updateZebraStatusPrinted(token, apiId) {
     if (!apiId) return false;
 
-    const url = await buildApiUrl('/updatePdfStatus');
+    const url = await buildApiUrl('/api/updateZebraStatus');
     const ctrl = new AbortController();
     const timeout = setTimeout(() => ctrl.abort(), 15000);
 
