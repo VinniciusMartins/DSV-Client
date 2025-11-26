@@ -4,6 +4,8 @@ const path = require('path');
 const net = require('net');
 const PowerShellService = require('../services/powershellService');
 
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
 function zebraStorePath(app) {
     const dir = app.getPath('userData');
     const file = path.join(dir, 'zebra_printers.json');
@@ -140,6 +142,33 @@ namespace Win32 {
     if (!/OK/i.test(result || '')) {
         throw new Error(result || 'Raw print failed');
     }
+
+    await waitForPrintCompletion(name);
+}
+
+async function waitForPrintCompletion(printerName, timeoutMs = 45000) {
+    const startedAt = Date.now();
+    const settleMs = 1200;
+
+    while (Date.now() - startedAt < timeoutMs) {
+        const job = await psRawPrinter.getLatestPrintJob(printerName).catch(() => null);
+
+        if (!job) {
+            await delay(settleMs);
+            const stillNone = await psRawPrinter.getLatestPrintJob(printerName).catch(() => null);
+            if (!stillNone) return true;
+        } else {
+            const status = String(job.JobStatusText || job.JobStatus || '').toLowerCase();
+            if (status.includes('printed') || status.includes('complete')) {
+                await delay(settleMs);
+                return true;
+            }
+        }
+
+        await delay(800);
+    }
+
+    throw new Error('Print job timeout waiting for completion');
 }
 
 module.exports = {
